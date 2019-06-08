@@ -13,20 +13,27 @@
 # BASIC SETTINGS (objects, flags, etc.)
 ######################################################################################################################################
 
-OBJS = main.o
+OBJ_DIR = obj
+SRC_DIR = src
+
+OBJS = $(OBJ_DIR)/main.o $(OBJ_DIR)/DCMSTP.o $(OBJ_DIR)/DCMSTPLagrangean.o $(OBJ_DIR)/DisjointSets.o
+
 BINARY_NAME = dcmstp-solver
 LINKING_FLAGS = -O3 -std=c++11
-COMPILATION_FLAGS = -c -O3 -std=c++11
+COMPILATION_FLAGS = -c -O3 -std=c++11 -Iinclude
 
 ######################################################################################################################################
 # COMPILATION
 ######################################################################################################################################
-all: $(OBJS)
+all: create_obj_dir $(OBJS)
 		g++ $(OBJS) -o $(BINARY_NAME) $(LINKING_FLAGS)
 
-%.o: %.cpp
+create_obj_dir:
+		mkdir -p $(OBJ_DIR)
+
+$(OBJS): $(OBJ_DIR)/%.o : $(SRC_DIR)/%.cpp
 		g++ -c $< -o $@ $(COMPILATION_FLAGS)
 
 ######################################################################################################################################
 clean:
-		rm *.o $(BINARY_NAME)
+		rm -rf $(OBJ_DIR) $(BINARY_NAME)
