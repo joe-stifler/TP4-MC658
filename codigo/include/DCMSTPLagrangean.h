@@ -13,6 +13,7 @@
 #ifndef TP4_DCMSTPLAGRANGEAN_H
 #define TP4_DCMSTPLAGRANGEAN_H
 
+#include <cmath>
 #include <memory>
 #include <vector>
 #include <algorithm>
@@ -34,10 +35,16 @@ public:
     void solve() override;
 
 private:
+    int z_ub;
+    float z_lb;
+    int maxIters = 2000;
+    float subgradientNorm;
     DisjointSets disjointSets;
     std::vector<int> subgradient;
-    std::vector<Edge> spannigTree;
+    std::vector<Edge> spanningTree;
     std::vector<float> lagrangeanMultipliers;
+
+    void calculateUb();
 };
 
 #endif // TP4_DCMSTPLAGRANGEAN_H

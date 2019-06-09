@@ -2,4 +2,4 @@
 
 make -j
 
-./dcmstp-solver ../instancias/tb1ct100_1.txt 1 l
+./dcmstp-solver ../instancias/tb2ct500_3.txt 10 l

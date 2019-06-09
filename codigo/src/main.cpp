@@ -42,7 +42,7 @@ int main(int argc, const char **argv) {
 		/* Reads graph */
 		std::getline(instanceFile, line);
 
-		input << line;
+		input = std::stringstream(line);
 		input >> n >> m;
 
 		if (argv[3][0] == 'l') {
@@ -64,7 +64,7 @@ int main(int argc, const char **argv) {
 			while (m--) {
 				std::getline(instanceFile, line);
 
-				input << line;
+                input = std::stringstream(line);
 				input >> u >> v >> w;
 
 				solver->addEdge(u - 1, v - 1, w);
@@ -74,7 +74,7 @@ int main(int argc, const char **argv) {
 			while (n--) {
 				std::getline(instanceFile, line);
 
-				input << line;
+                input = std::stringstream(line);
 				input >> u >> d;
 
 				solver->setVertexMaxDegree(u - 1, d);

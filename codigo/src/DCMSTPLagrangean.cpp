@@ -14,7 +14,7 @@
 
 DCMSTPLagrangean::DCMSTPLagrangean(int _n, int _limitTime, clock_t _initialTime) : DCMSTP(_n, _limitTime, _initialTime) {
     subgradient.resize(_n);
-    spannigTree.resize(_n - 1);
+    spanningTree.resize(_n - 1);
     disjointSets.initialize(_n);
     lagrangeanMultipliers.resize(_n);
 }
@@ -45,41 +45,72 @@ void DCMSTPLagrangean::solveMstp() {
         if (disjointSets.find(u) != disjointSets.find(v)) {
             disjointSets.unionSets(u, v);
 
-            spannigTree[edgesSpanTree] = *currentEdge;
+            spanningTree[edgesSpanTree] = *currentEdge;
             ++edgesSpanTree;
         }
 
         currentEdge++;
     }
+
+    z_lb = 0.0f;
+    subgradientNorm = 0.0f;
+    std::fill(subgradient.begin(), subgradient.end(), 0);
+
+    for (int i = 0; i < getNumVertices(); ++i) {
+        /* Step 3: Updates subgradient */
+        subgradient[i] -= 1 * degrees[i];
+
+        if (i < getNumVertices() - 1) {
+            /* Step 3: Updates subgradient */
+            subgradient[spanningTree[i].u] += 1;
+            subgradient[spanningTree[i].v] += 1;
+
+            /* Step 4: Calculates current lower bound */
+            Edge &e = spanningTree[i];
+
+            z_lb += (e.w + lagrangeanMultipliers[e.u] + lagrangeanMultipliers[e.v]);
+        }
+
+        /* Step 4: Calculates current lower bound */
+        z_lb -= lagrangeanMultipliers[i] * degrees[i];
+    }
+
+    for (int i = 0; i < getNumVertices(); ++i) {
+        subgradientNorm += std::pow(subgradient[i], 2.0f);
+    }
+}
+
+void DCMSTPLagrangean::calculateUb() {
+    z_ub = 8703;
 }
 
 void DCMSTPLagrangean::solve() {
+    int iters = 0;
+    float alpha = 2.0f;
 
-    /* Step 1: Initializes PI, Z_UB and lagrangean multipliers */
-    int z_ub = 1;
+    maxIters = 10000;
+
+    /* Step 1: Finds a first valid solution to the DCMSTP */
+    calculateUb();
 
     std::fill(lagrangeanMultipliers.begin(), lagrangeanMultipliers.end(), 0);
 
-    while (GET_TIME(initialTime, clock()) < limitTime) {
+    while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
         /* Step 2: Solves MSTP with lagrangean multipliers added to the edges */
         solveMstp();
 
-        /* Step 3: Updates subgradient */
-        for (int i = 0; i < getNumVertices(); ++i) {
-            subgradient[i] = -1 * degrees[i];
-        }
+        printf("z_lb (%d) : %f\n", iters, z_lb);
 
-        for (int i = 0; i < getNumVertices() - 1; ++i) {
-            subgradient[spannigTree[i].u] += 1;
-            subgradient[spannigTree[i].v] += 1;
-        }
+        if (subgradientNorm < 1e-10) break;
 
-        /* Step 4: Calculates step size */
-        float stepSize = 1.0;
+        /* Step 5: Calculates step size */
+        float stepSize = alpha * (z_ub - z_lb) / subgradientNorm;
 
-        /* Step 5: Update lagrangean multipliers */
+        /* Step 6: Update lagrangean multipliers */
         for (int i = 0; i < getNumVertices(); ++i) {
             lagrangeanMultipliers[i] = std::max(0.0f, lagrangeanMultipliers[i] + stepSize * subgradient[i]);
         }
+
+        ++iters;
     }
 }
