@@ -68,7 +68,7 @@ void DCMSTPLagrangean::kruskalx() {
             }
 
             /* components in (E_1 U {e_k}) are non saturated then */
-            if (treeUSaturated == false && treeUSaturated == false) {
+            if (edgesSpanTree + 1 == getNumVertices() - 1 || (treeUSaturated == false && treeUSaturated == false)) {
                 disjointSets.unionSets(u, v);
 
                 spanningTree[edgesSpanTree] = *currentEdge;
@@ -188,5 +188,5 @@ void DCMSTPLagrangean::solve() {
         ++iters;
     }
 
-    printf("max lb, ub: %f -- %d\n", max_z_lb, z_ub);
+    printf("max lb, ub: %f -- %d\n", max_z_lb, min_z_ub);
 }
