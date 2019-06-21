@@ -57,18 +57,20 @@ void DCMSTPLagrangean::kruskalx() {
             bool treeVSaturated = true;
 
             /* Verify if the tree related with U and V are both nonsaturated */
-            for (int w = 0; w < getNumVertices() && (treeUSaturated || treeVSaturated); ++w) {
+            for (int w = 0; w < getNumVertices(); ++w) {
                 if (degreeTemp[w] < degrees[w]) {
-                    if (treeUSaturated && disjointSets.find(u) == disjointSets.find(w)) {
+                    if (disjointSets.find(u) == disjointSets.find(w)) {
                         treeUSaturated = false;
-                    } else if (treeVSaturated && disjointSets.find(v) == disjointSets.find(w)) {
+                    }
+
+                    if (disjointSets.find(v) == disjointSets.find(w)) {
                         treeVSaturated = false;
                     }
                 }
             }
 
             /* components in (E_1 U {e_k}) are non saturated then */
-            if (edgesSpanTree + 1 == getNumVertices() - 1 || (treeUSaturated == false && treeUSaturated == false)) {
+            if (edgesSpanTree + 1 == getNumVertices() - 1 || treeUSaturated == false || treeVSaturated == false) {
                 disjointSets.unionSets(u, v);
 
                 spanningTree[edgesSpanTree] = *currentEdge;
@@ -172,13 +174,13 @@ void DCMSTPLagrangean::solve() {
 
         min_z_ub = std::min(min_z_ub, z_ub);
 
-        if (iters % 100 == 0)
+        if (iters % 10 == 0)
             printf("z_lb (%d) : %f  --  %d\n", iters, z_lb, z_ub);
 
         if (subgradientNorm < 1e-10) break;
 
         /* Step 5: Calculates step size */
-        float stepSize = alpha * ((1.0f + beta) * min_z_ub - z_lb) / subgradientNorm;
+        float stepSize = alpha * ((1.0f + beta) * z_ub - z_lb) / subgradientNorm;
 
         /* Step 6: Update lagrangean multipliers */
         for (int i = 0; i < getNumVertices(); ++i) {
