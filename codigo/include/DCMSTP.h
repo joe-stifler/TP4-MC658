@@ -13,6 +13,7 @@
 #ifndef TP4_DCMSTP_H
 #define TP4_DCMSTP_H
 
+#include <ctime>
 #include <memory>
 #include <vector>
 #include <cstdio>

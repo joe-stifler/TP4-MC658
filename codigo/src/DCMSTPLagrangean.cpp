@@ -14,12 +14,13 @@
 
 DCMSTPLagrangean::DCMSTPLagrangean(int _n, int _limitTime, clock_t _initialTime) : DCMSTP(_n, _limitTime, _initialTime) {
     subgradient.resize(_n);
+    degreeTemp.resize(_n);
     spanningTree.resize(_n - 1);
     disjointSets.initialize(_n);
     lagrangeanMultipliers.resize(_n);
 }
 
-void DCMSTPLagrangean::solveMstp() {
+void DCMSTPLagrangean::sortEdges() {
     /* Sorts edge vector by edge weigth
      * (considering here the lagrangean
      * multipliers associated with the edge) */
@@ -32,12 +33,63 @@ void DCMSTPLagrangean::solveMstp() {
 
         return e1.w + lamb1_e1 + lamb2_e1 < e2.w + lamb1_e2 + lamb2_e2;
     });
+}
 
+void DCMSTPLagrangean::kruskalx() {
+    int edgesSpanTree = 0;
+    auto currentEdge = edges.begin();
+
+    disjointSets.clean();
+    std::fill(degreeTemp.begin(), degreeTemp.end(), 0);
+
+    /* while a tree was not formed or not all the edges were used */
+    while (edgesSpanTree < getNumVertices() - 1 && currentEdge != edges.end()) {
+        int u = currentEdge->u;
+        int v = currentEdge->v;
+
+        if (degreeTemp[u] < degrees[u] && degreeTemp[v] < degrees[v]
+                    && disjointSets.find(u) != disjointSets.find(v)) {
+
+            ++degreeTemp[u];
+            ++degreeTemp[v];
+
+            bool treeUSaturated = true;
+            bool treeVSaturated = true;
+
+            /* Verify if the tree related with U and V are both nonsaturated */
+            for (int w = 0; w < getNumVertices() && (treeUSaturated || treeVSaturated); ++w) {
+                if (degreeTemp[w] < degrees[w]) {
+                    if (treeUSaturated && disjointSets.find(u) == disjointSets.find(w)) {
+                        treeUSaturated = false;
+                    } else if (treeVSaturated && disjointSets.find(v) == disjointSets.find(w)) {
+                        treeVSaturated = false;
+                    }
+                }
+            }
+
+            /* components in (E_1 U {e_k}) are non saturated then */
+            if (treeUSaturated == false && treeUSaturated == false) {
+                disjointSets.unionSets(u, v);
+
+                spanningTree[edgesSpanTree] = *currentEdge;
+                ++edgesSpanTree;
+            } else {
+                --degreeTemp[u];
+                --degreeTemp[v];
+            }
+        }
+
+        currentEdge++;
+    }
+}
+
+void DCMSTPLagrangean::kruskal() {
     int edgesSpanTree = 0;
     auto currentEdge = edges.begin();
 
     disjointSets.clean();
 
+    /* while a tree was not formed or not all the edges were used */
     while (edgesSpanTree < getNumVertices() - 1 && currentEdge != edges.end()) {
         int u = currentEdge->u;
         int v = currentEdge->v;
@@ -51,9 +103,10 @@ void DCMSTPLagrangean::solveMstp() {
 
         currentEdge++;
     }
+}
 
+void DCMSTPLagrangean::updateSubgradLowerVals() {
     z_lb = 0.0f;
-    subgradientNorm = 0.0f;
     std::fill(subgradient.begin(), subgradient.end(), 0);
 
     for (int i = 0; i < getNumVertices(); ++i) {
@@ -75,36 +128,57 @@ void DCMSTPLagrangean::solveMstp() {
         z_lb -= lagrangeanMultipliers[i] * degrees[i];
     }
 
-    for (int i = 0; i < getNumVertices(); ++i) {
-        subgradientNorm += std::pow(subgradient[i], 2.0f);
-    }
+    /* calculates 2-norm of subgradient vector */
+    subgradientNorm = std::inner_product(subgradient.begin(), subgradient.end(), subgradient.begin(), 0.0f);
 }
 
 void DCMSTPLagrangean::calculateUb() {
-    z_ub = 8703;
+    sortEdges();
+    kruskalx();
+
+    z_ub = 0;
+
+    for (int i = 0; i < getNumVertices(); ++i) {
+        z_ub += spanningTree[i].w;
+    }
 }
 
 void DCMSTPLagrangean::solve() {
     int iters = 0;
+    float beta = 0.0f;
     float alpha = 2.0f;
+    int maxIters = 1000;
+    int min_z_ub = std::numeric_limits<int>::max();
+    float max_z_lb = std::numeric_limits<float>::min();
 
-    maxIters = 10000;
+    std::fill(lagrangeanMultipliers.begin(), lagrangeanMultipliers.end(), 0);
 
     /* Step 1: Finds a first valid solution to the DCMSTP */
     calculateUb();
 
-    std::fill(lagrangeanMultipliers.begin(), lagrangeanMultipliers.end(), 0);
+    min_z_ub = std::min(min_z_ub, z_ub);
 
     while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
         /* Step 2: Solves MSTP with lagrangean multipliers added to the edges */
-        solveMstp();
+        sortEdges();
+        kruskal();
 
-        printf("z_lb (%d) : %f\n", iters, z_lb);
+        /* Step 3 and 4 */
+        updateSubgradLowerVals();
+
+        max_z_lb = std::max(max_z_lb, z_lb);
+
+        calculateUb();
+
+        min_z_ub = std::min(min_z_ub, z_ub);
+
+        if (iters % 100 == 0)
+            printf("z_lb (%d) : %f  --  %d\n", iters, z_lb, z_ub);
 
         if (subgradientNorm < 1e-10) break;
 
         /* Step 5: Calculates step size */
-        float stepSize = alpha * (z_ub - z_lb) / subgradientNorm;
+        float stepSize = alpha * ((1.0f + beta) * min_z_ub - z_lb) / subgradientNorm;
 
         /* Step 6: Update lagrangean multipliers */
         for (int i = 0; i < getNumVertices(); ++i) {
@@ -113,4 +187,6 @@ void DCMSTPLagrangean::solve() {
 
         ++iters;
     }
+
+    printf("max lb, ub: %f -- %d\n", max_z_lb, z_ub);
 }

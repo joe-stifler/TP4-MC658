@@ -16,6 +16,7 @@
 #include <cmath>
 #include <memory>
 #include <vector>
+#include <numeric>
 #include <algorithm>
 
 #include <DCMSTP.h>
@@ -31,20 +32,23 @@ public:
      * */
     DCMSTPLagrangean(int _n, int _limitTime, clock_t _initialTime);
 
-    void solveMstp();
     void solve() override;
 
 private:
     int z_ub;
     float z_lb;
-    int maxIters = 2000;
     float subgradientNorm;
     DisjointSets disjointSets;
+    std::vector<int> degreeTemp;
     std::vector<int> subgradient;
     std::vector<Edge> spanningTree;
     std::vector<float> lagrangeanMultipliers;
 
+    void kruskal();
+    void kruskalx();
+    void sortEdges();
     void calculateUb();
+    void updateSubgradLowerVals();
 };
 
 #endif // TP4_DCMSTPLAGRANGEAN_H
