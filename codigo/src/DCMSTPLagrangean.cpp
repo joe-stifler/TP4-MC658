@@ -145,6 +145,53 @@ void DCMSTPLagrangean::calculateUb() {
     }
 }
 
+void DCMSTPLagrangean::improvementProcedure() {
+	
+	int i,j;
+	
+	spanningTreeTemp = spanningTree;
+	Edge e;
+	
+	sortEdges();
+	auto currentEdge = edges.begin();
+	
+	for(i = 0; i < getNumVertices(); ++i) {
+		
+		e = spanningTreeTemp[i];
+		
+		/* Remove 'e' from tree, creating two trees */
+		spanningTree.erase(spanningTree.begin()+i);
+		
+		/* Find both trees and compute vertices degree for next step */
+		disjointSets.clean();
+		std::fill(degreeTemp.begin(), degreeTemp.end(), 0);
+		for(j = 0; j < getNumVertices()-1; ++j) {
+			disjointSets.unionSets(spanningTree[j].u, spanningTree[j].v);
+			degreeTemp[spanningTree[j].u]++;
+			degreeTemp[spanningTree[j].v]++;
+		}
+		
+		/* Select minimun cost edge that connects both trees without violating degree constraints */
+		currentEdge = edges.begin();
+		for(j = 0; j < getNumEdges(); ++j) {
+			if (disjointSets.find(currentEdge->u) != disjointSets.find(currentEdge->v)
+				&& degreeTemp[currentEdge->u] < degrees[currentEdge->u]
+				&& degreeTemp[currentEdge->v] < degrees[currentEdge->v])
+				break;
+			currentEdge++;
+		}
+		
+		/* If selected edge lighter than the removed one, switch */
+		if(j < getNumEdges() && currentEdge->w < e.w) {
+			spanningTree.push_back(*currentEdge);
+		}
+		else {
+			spanningTree.push_back(e);
+		}
+ 	}
+	
+}
+
 void DCMSTPLagrangean::solve() {
     int iters = 0;
     float beta = 0.0f;

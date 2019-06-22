@@ -42,8 +42,10 @@ private:
     std::vector<int> degreeTemp;
     std::vector<int> subgradient;
     std::vector<Edge> spanningTree;
+    std::vector<Edge> spanningTreeTemp;
     std::vector<float> lagrangeanMultipliers;
-
+    
+	void improvementProcedure();
     void kruskal();
     void kruskalx();
     void sortEdges();
