@@ -17,6 +17,9 @@
 
 class DisjointSets {
 public:
+    std::vector<int> rank;
+    std::vector<int> parent;
+
     DisjointSets();
     DisjointSets(int _n);
 
@@ -27,8 +30,6 @@ public:
     void unionSets(int _u, int _v);
 
 private:
-    std::vector<int> rank;
-    std::vector<int> parent;
 };
 
 

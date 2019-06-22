@@ -40,17 +40,16 @@ private:
     float subgradientNorm;
     DisjointSets disjointSets;
     std::vector<int> degreeTemp;
+    DisjointSets disjointDegSets;
     std::vector<int> subgradient;
+    std::vector<bool> vertexInTree;
     std::vector<Edge> spanningTree;
+    std::vector<Edge> degSpanningTree;
     std::vector<Edge> spanningTreeTemp;
     std::vector<float> lagrangeanMultipliers;
     
-	void improvementProcedure();
-    void kruskal();
-    void kruskalx();
-    void sortEdges();
-    void calculateUb();
-    void updateSubgradLowerVals();
+    void improvementProcedure();
+    void kruskalx(bool shouldRedux);
 };
 
 #endif // TP4_DCMSTPLAGRANGEAN_H
