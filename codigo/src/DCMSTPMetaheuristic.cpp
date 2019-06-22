@@ -16,6 +16,8 @@
 
 DCMSTPMetaheuristic::DCMSTPMetaheuristic(int _n, int _limitTime, clock_t _initialTime) : DCMSTP(_n, _limitTime, _initialTime) {
     population.resize(POP_SIZE);
+    degreeTemp.resize(_n);
+    disjointSets.initialize(_n);
 }
   
 // A utility function that creates a graph of  
@@ -70,77 +72,93 @@ bool searchEdge(Graph* graph, int src, int dest)
 }
 
 void DCMSTPMetaheuristic::RandomKruskalX(Graph* individual) {
-	
-	std::vector<int> treeDegrees(getNumVertices(), 0); /* Tree vertices degree */
-	std::vector<Edge> remainingEdges = edges;          /* Edges not considered to be in the tree */
-	
-	int E = 0; // E: number of edges in the tree
+
+	std::vector<Edge> remainingEdges = edges; /* Edges not considered to be in the tree */
+
 	Edge ek;   // Edge being considered
 	int idx;   // Index of the edge being considered
 	
-	int sumTreeDegrees = 0; // Check saturation
-	disjointSets.clean();   // Check cycles
-	
-	while(E < getNumVertices() - 1) {
-		
-		/* initialize random seed: */
- 		srand (time(NULL));
+	int edgesSpanTree = 0;
+    auto currentEdge = edges.begin();
+
+    disjointSets.clean();
+    std::fill(degreeTemp.begin(), degreeTemp.end(), 0);
+    
+	/* initialize random seed: */
+ 	srand (time(NULL));
+ 	
+    /* while a tree was not formed or not all the edges were used */
+    while (edgesSpanTree < getNumVertices() - 1) {
 
  		/* random number between 0 and number of edges not considered */
 		idx = rand() % (remainingEdges.size()-1);
-		
+
 		/* consider edge idx */
 		ek = remainingEdges[idx];
 		
+        int u = ek.u;
+        int v = ek.v;
+
 		/* erase the considered edge */
   		remainingEdges.erase(remainingEdges.begin()+idx);
-  		
-  		if(treeDegrees[ek.u] < degrees[ek.u] && treeDegrees[ek.v] < degrees[ek.v]) {
+
+        if (degreeTemp[u] < degrees[u] && degreeTemp[v] < degrees[v]
+                    && disjointSets.find(u) != disjointSets.find(v)) {
+
+            ++degreeTemp[u];
+            ++degreeTemp[v];
 			
-			if (disjointSets.find(ek.u) != disjointSets.find(ek.v)) {
-				
-				if(E + 1 == getNumVertices() - 1) {
-					addEdgeSet(individual, ek.u, ek.v);
-				}
-				
-				else {
-					
-					if(2*(E+1) < sumTreeDegrees + treeDegrees[ek.u] + treeDegrees[ek.v]) {
-						
-						disjointSets.unionSets(ek.u, ek.v);
-						addEdgeSet(individual, ek.u, ek.v);
-						treeDegrees[ek.u]++;
-						treeDegrees[ek.v]++;
-						E++;
-						sumTreeDegrees = sumTreeDegrees + treeDegrees[ek.u] + treeDegrees[ek.v]; //<< provavelmente errado
-					}
-				}	
-			}
-		}
-	}
+            bool treeUSaturated = true;
+            bool treeVSaturated = true;
+
+            /* Verify if the tree related with U and V are both nonsaturated */
+            for (int w = 0; w < getNumVertices(); ++w) {
+                if (degreeTemp[w] < degrees[w]) {
+                    if (disjointSets.find(u) == disjointSets.find(w)) {
+                        treeUSaturated = false;
+                    }
+
+                    if (disjointSets.find(v) == disjointSets.find(w)) {
+                        treeVSaturated = false;
+                    }
+                }
+            }
+
+            /* components in (E_1 U {e_k}) are non saturated then */
+            if (edgesSpanTree + 1 == getNumVertices() - 1 || treeUSaturated == false || treeVSaturated == false) {
+                disjointSets.unionSets(u, v);
+
+                addEdgeSet(individual, u, v);
+                ++edgesSpanTree;
+            } else {
+                --degreeTemp[u];
+                --degreeTemp[v];
+            }
+        }
+    }
 }
 
 void DCMSTPMetaheuristic::initializePopulation() {
 	int i;
 	
+	struct Graph* individual = createGraph(getNumVertices());
     /* Generate POP_SIZE random individuals */
 	for(i = 0; i < POP_SIZE; i++) {
-		
-		struct Graph* individual = createGraph(getNumVertices());
 		RandomKruskalX(individual);
 		population[i] = *individual;
 	}
 }
 
 void DCMSTPMetaheuristic::solve() {
+
     int iters = 0;
 
     maxIters = 10000;
-
+    
     /* Step 1: Initialize population with random DCMST */
 	initializePopulation();
 
-	printf("teste: (%d)\n", population[0].V);
+	//printf("teste: (%d)\n", population[0].V);
 	
 	/* Step 2: Recombine and mutate until stop criteria */
     while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {

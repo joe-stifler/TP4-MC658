@@ -16,6 +16,7 @@ DCMSTPLagrangean::DCMSTPLagrangean(int _n, int _limitTime, clock_t _initialTime)
     subgradient.resize(_n);
     degreeTemp.resize(_n);
     spanningTree.resize(_n - 1);
+    spanningTreeTemp.resize(_n - 1);
     disjointSets.initialize(_n);
     lagrangeanMultipliers.resize(_n);
 }

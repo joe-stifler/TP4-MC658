@@ -39,6 +39,7 @@ private:
     float z_lb;
     int maxIters = 2000;
     std::vector<Graph> population;
+    std::vector<int> degreeTemp;
     DisjointSets disjointSets;
     
     void RandomKruskalX(Graph*);
