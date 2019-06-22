@@ -16,7 +16,7 @@
 OBJ_DIR = obj
 SRC_DIR = src
 
-OBJS = $(OBJ_DIR)/main.o $(OBJ_DIR)/DCMSTP.o $(OBJ_DIR)/DCMSTPLagrangean.o $(OBJ_DIR)/DisjointSets.o
+OBJS = $(OBJ_DIR)/main.o $(OBJ_DIR)/DCMSTP.o $(OBJ_DIR)/DCMSTPLagrangean.o $(OBJ_DIR)/DisjointSets.o $(OBJ_DIR)/DCMSTPMetaheuristic.o
 
 BINARY_NAME = dcmstp-solver
 LINKING_FLAGS = -O3 -std=c++11

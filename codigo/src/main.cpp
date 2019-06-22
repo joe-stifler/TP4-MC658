@@ -19,6 +19,7 @@
 
 #include <DCMSTP.h>
 #include <DCMSTPLagrangean.h>
+#include <DCMSTPMetaheuristic.h>
 
 int main(int argc, const char **argv) {
 	if (argc == 4) {
@@ -50,8 +51,7 @@ int main(int argc, const char **argv) {
 			solver.reset(new DCMSTPLagrangean(n, maximumTime, initialTime));
 		} else if (argv[3][0] == 'm') {
 			/* Metaheuristic */
-
-			/* solver.reset(new DCMSTPMetaheuristic(n)); */
+			solver.reset(new DCMSTPMetaheuristic(n, maximumTime, initialTime));
 		} else {
 			printf("ERROR: You should correctly especify the fourth param, where it "
 		           "must be either 'l' for lagrangean heuristic or 'm' for metaheuristic.\n");
