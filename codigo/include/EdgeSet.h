@@ -1,17 +1,16 @@
 #ifndef TP4_EDGE_SET_H
 #define TP4_EDGE_SET_H
 
-#include <unordered_set>
+#include <vector>
+#include <Edge.h>
 
-struct Graph { 
-    int V; 
-    std::unordered_set<int>* adjList; 
+struct Chromosome { 
+    std::vector<Edge> spanningTree;
+    int fitness;
 }; 
 
-Graph* createGraph(int V);
+Chromosome* createChr(int V);
 
-void addEdgeSet(Graph*, int, int);
-  
-bool searchEdge(Graph*, int, int);
+void addEdgeChr(Chromosome*, int, int);
 
 #endif //TP4_EDGE_SET_H
