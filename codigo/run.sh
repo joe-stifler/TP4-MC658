@@ -2,5 +2,5 @@
 
 make -j
 
-./dcmstp-solver ../instancias/tb1ct300_1.txt 10 l
+./dcmstp-solver ../instancias/tb2ct500_1.txt 30 m
 

@@ -150,7 +150,14 @@ void DCMSTPLagrangean::kruskalx(bool shouldRedux) {
 }
 
 void DCMSTPLagrangean::improvementProcedure() {
-	for(int i = 0; i < getNumVertices(); ++i) {
+    std::set<std::pair<int, int>> usedEdges;
+
+    for(int i = 0; i < getNumVertices() - 1; ++i) {
+        Edge &e = degSpanningTree[i];
+        usedEdges.insert(std::make_pair(e.u, e.v));
+    }
+
+	for(int i = 0; i < getNumVertices() - 1; ++i) {
 		Edge &e = degSpanningTree[i];
 
         disjointDegSets.clean();
@@ -164,25 +171,36 @@ void DCMSTPLagrangean::improvementProcedure() {
 
                 disjointDegSets.unionSets(degSpanningTree[j].u, degSpanningTree[j].v);
             }
-		}
+        }
+
+        Edge newEdge = e;
+        Edge oldEdge = e;
 
         /* Select minimun cost edge that connects both
          * trees without violating degree constraints */
         auto currentEdge = edges.begin();
         for(int j = 0; j < getNumEdges(); ++j) {
             /* If selected edge is lighter than the removed one, switch */
-            if (currentEdge->w < degSpanningTree[i].w &&
-			        disjointDegSets.find(currentEdge->u) != disjointDegSets.find(currentEdge->v)
-				        && degreeTemp[currentEdge->u] < degrees[currentEdge->u] && degreeTemp[currentEdge->v] < degrees[currentEdge->v]) {
-
-                z_ub += currentEdge->w;
-                z_ub -= degSpanningTree[i].w;
-
-                degSpanningTree[i] = *currentEdge;
+            if (currentEdge->w < newEdge.w
+                    && degreeTemp[currentEdge->u] < degrees[currentEdge->u]
+                        && degreeTemp[currentEdge->v] < degrees[currentEdge->v]
+                           && disjointDegSets.find(currentEdge->u) != disjointDegSets.find(currentEdge->v)
+                               && usedEdges.find(std::make_pair(currentEdge->u, currentEdge->v)) == usedEdges.end()) {
+                newEdge = *currentEdge;
             }
 
-			currentEdge++;
-		}
+            currentEdge++;
+        }
+
+        if (newEdge.u != oldEdge.u || newEdge.v != oldEdge.v) {
+            z_ub += newEdge.w;
+            z_ub -= oldEdge.w;
+
+            degSpanningTree[i] = newEdge;
+
+            usedEdges.erase(std::make_pair(oldEdge.u, oldEdge.v));
+            usedEdges.insert(std::make_pair(newEdge.u, newEdge.v));
+        }
  	}
 }
 
@@ -190,7 +208,7 @@ void DCMSTPLagrangean::solve() {
     int iters = 0;
     float beta = 0.0f;
     float alpha = 2.0f;
-    int maxIters = 10000;
+    int maxIters = 10000000;
     int bestPrimal = std::numeric_limits<int>::max();
     float bestDual = std::numeric_limits<float>::min();
 
@@ -203,11 +221,11 @@ void DCMSTPLagrangean::solve() {
     bestDual = std::max(bestDual, z_lb);
     bestPrimal = std::min(bestPrimal, z_ub);
 
-    while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
+    while (bestPrimal - bestDual >= 1.0f && iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
         /* Step 2: Solves MSTP with lagrangean multipliers added to the edges */
         kruskalx(false);
 
-        if (iters % 50 == 0) {
+        if (iters % 100 == 0) {
             improvementProcedure();
             printf("z_lb (%d) : %f  --  %d\n", iters, z_lb, z_ub);
         }

@@ -4,12 +4,25 @@
 #include <vector>
 #include <Edge.h>
 
-struct Chromosome { 
-    std::vector<Edge> spanningTree;
+struct Chromosome {
     int fitness;
-}; 
+    std::vector<Edge> spanningTree;
 
-Chromosome* createChr(int V);
+    Chromosome() {
+        fitness = 0;
+    }
+
+    Chromosome(int _n) {
+        fitness = 0;
+        spanningTree.resize(_n);
+    }
+
+    // Adds an edge to spanning tree
+    void addEdge(Edge e) {
+        fitness += e.w;
+        spanningTree.push_back(e);
+    }
+};
 
 void addEdgeChr(Chromosome*, int, int);
 

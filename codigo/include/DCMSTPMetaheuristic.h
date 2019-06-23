@@ -13,9 +13,11 @@
 #ifndef TP4_DCMSTPMETAHEURISTIC_H
 #define TP4_DCMSTPMETAHEURISTIC_H
 
+#include <set>
 #include <cmath>
 #include <memory>
 #include <vector>
+#include <random>
 #include <algorithm>
 
 #include <DCMSTP.h>
@@ -36,17 +38,15 @@ public:
 
 private:
     int z_ub;
-    float z_lb;
-    int maxIters = 2000;
-    std::vector<Chromosome> population;
-    std::vector<Chromosome> sons;
-    std::vector<int> degreeTemp;
     DisjointSets disjointSets;
-    
-    void RandomKruskalX(Chromosome*);
+    std::vector<int> degreeTemp;
+    std::vector<Chromosome> sons;
+    std::vector<Chromosome> population;
+
+    void mutate(Chromosome &);
     void initializePopulation();
-    Chromosome crossover(Chromosome,Chromosome);
-    void mutate();
+    void RandomKruskalX(Chromosome &, bool);
+    Chromosome crossover(Chromosome &, Chromosome &);
 
 };
 

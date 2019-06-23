@@ -13,6 +13,7 @@
 #ifndef TP4_DCMSTPLAGRANGEAN_H
 #define TP4_DCMSTPLAGRANGEAN_H
 
+#include <set>
 #include <cmath>
 #include <memory>
 #include <vector>

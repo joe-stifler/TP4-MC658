@@ -18,6 +18,10 @@ struct Edge {
         v = _v;
         w = _w;
     }
+
+    bool operator <(const Edge &other) const {
+        return w < other.w;
+    }
 };
 
 #endif //TP4_EDGE_H

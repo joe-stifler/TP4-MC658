@@ -12,79 +12,34 @@
 
 #include <DCMSTPMetaheuristic.h>
 
-#define POP_SIZE 10    // size of initial population
-#define CROSS_PROB 0.8 // crossover probability
+#define POP_SIZE 50    // size of initial population
+#define CROSS_PROB 0.5 // crossover probability
 
 DCMSTPMetaheuristic::DCMSTPMetaheuristic(int _n, int _limitTime, clock_t _initialTime) : DCMSTP(_n, _limitTime, _initialTime) {
-    population.resize(POP_SIZE);
-    sons.resize(CROSS_PROB*POP_SIZE);
     degreeTemp.resize(_n);
     disjointSets.initialize(_n);
+    population.resize(POP_SIZE);
 }
 
-Chromosome* createChr(int V)
-{
-    Chromosome* chr = new Chromosome;
-    //chr->spanningTree = new std::vector<Edge>;
-    chr->spanningTree.resize(V);
-
-  	chr->fitness = 0;
-
-    return chr;
-}
-
-// Adds an edge to spanning tree
-void addEdgeChr(Chromosome* chr, Edge e)
-{
-    chr->spanningTree.push_back(e);
-    chr->fitness += e.w;
-}
-
-// A utility function to print the adjacency 
-// list representation of graph 
-/*void printGraph(Graph* graph) 
-{ 
-    for (int i = 0; i < graph->V; ++i) { 
-        std::unordered_set<int> lst = graph->adjList[i]; 
-        cout << endl << "Adjacency list of vertex "
-             << i << endl; 
-  
-        for (auto itr = lst.begin(); itr != lst.end(); ++itr) 
-            cout << *itr << " "; 
-        cout << endl; 
-    } 
-} */
-  
-/* Searches for a given edge in the graph
-bool searchEdge(Graph* graph, int src, int dest) 
-{
-    auto itr = graph->adjList[src].find(dest);
-    if (itr == graph->adjList[src].end())
-        return false;
-    return true;
-}*/
-
-void DCMSTPMetaheuristic::RandomKruskalX(Chromosome* individual) {
-
-	std::vector<Edge> remainingEdges = edges; /* Edges not considered to be in the tree */
-	std::random_shuffle(remainingEdges.begin(), remainingEdges.end());
-	
-	Edge ek;   // Edge being considered
-	int idx;   // Index of the edge being considered
-	
+void DCMSTPMetaheuristic::RandomKruskalX(Chromosome &individual, bool reduxEdges) {
 	/* Inicializacao da arvore */
-	int edgesSpanTree = 0;
-    disjointSets.clean();
-    std::fill(degreeTemp.begin(), degreeTemp.end(), 0);
-    idx = 0;
-    
+    int edgesSpanTree = 0;
+
+    /* Initialize arrays */
+    for (int i = 0; i < getNumVertices(); ++i) {
+        disjointSets.rank[i] = 0;
+        disjointSets.parent[i] = i;
+
+        degreeTemp[i] = 0;
+    }
+
+    int kEdge = 0;
+    auto currentEdge = edges.begin();
+
     /* while a tree was not formed or not all the edges were used */
-    while (edgesSpanTree < getNumVertices() - 1 && idx < remainingEdges.size()) {
-		
-		/* consider edge idx */
-		ek = remainingEdges[idx];
-        int u = ek.u;
-        int v = ek.v;
+    while (edgesSpanTree < getNumVertices() - 1 && currentEdge != edges.end()) {
+        int u = currentEdge->u;
+        int v = currentEdge->v;
 
         if (degreeTemp[u] < degrees[u] && degreeTemp[v] < degrees[v]
                     && disjointSets.find(u) != disjointSets.find(v)) {
@@ -111,112 +66,344 @@ void DCMSTPMetaheuristic::RandomKruskalX(Chromosome* individual) {
             /* components in (E_1 U {e_k}) are non saturated then */
             if (edgesSpanTree + 1 == getNumVertices() - 1 || treeUSaturated == false || treeVSaturated == false) {
                 disjointSets.unionSets(u, v);
-                addEdgeChr(individual, ek);
+                individual.addEdge(*currentEdge);
+
                 ++edgesSpanTree;
             } else {
                 --degreeTemp[u];
                 --degreeTemp[v];
             }
         }
-		idx++;
+
+        ++kEdge;
+        currentEdge++;
+    }
+
+    if (reduxEdges) {
+        edges.resize(std::min(3 * kEdge, (int) edges.size()));
     }
 }
 
 // Tempo medio de geracao de 1 individuo eh 0.008116 segundos no felipe pc na instancia tb2ct500_3
 void DCMSTPMetaheuristic::initializePopulation() {
-	int i;
-	
-	struct Chromosome* individual = createChr(getNumVertices());
     /* Generate POP_SIZE random individuals */
-	for(i = 0; i < POP_SIZE; i++) {
-		RandomKruskalX(individual);
-		population[i] = *individual;
+	for(int i = 0; i < POP_SIZE; i++) {
+	    if (i == 0) {
+            std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
+                return e1.w < e2.w;
+            });
+
+            RandomKruskalX(population[i], true);
+	    } else {
+            std::random_shuffle(edges.begin(), edges.end());
+            RandomKruskalX(population[i], false);
+        }
 	}
+
+    std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
+        return e1.w < e2.w;
+    });
 }
 
 /*
 Pegar todas as arestas em comum entre os pais.
-Pegar duas arestas aleatórias que pertencem a um e não a outro. Dessas duas escolher a de menor peso. Repetir esse passo até onde for possível.
-Caso necessário, completar a árvore com arestas que não pertencem a nenhum pai. Novamente este passo pode ser bem difícil para nosso caso
-(o grafo dele é completo e todos as restrições de grau são maiores que 2).
+Pegar duas arestas aleatï¿½rias que pertencem a um e nï¿½o a outro. Dessas duas escolher a de menor peso. Repetir esse passo atï¿½ onde for possï¿½vel.
+Caso necessï¿½rio, completar a ï¿½rvore com arestas que nï¿½o pertencem a nenhum pai. Novamente este passo pode ser bem difï¿½cil para nosso caso
+(o grafo dele ï¿½ completo e todos as restriï¿½ï¿½es de grau sï¿½o maiores que 2).
 */
-Chromosome DCMSTPMetaheuristic::crossover(Chromosome x, Chromosome y) {
-	int i;
-	
-	Chromosome xy;
-    
-	return xy;
+Chromosome DCMSTPMetaheuristic::crossover(Chromosome &parent1, Chromosome &parent2) {
+	Chromosome child;
+    std::default_random_engine generator;
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+    int edgesSpanTree = 0;
+
+    std::vector<Edge> edgesPar1;
+    std::vector<Edge> edgesPar2;
+
+    std::set<std::pair<int, int>> usedEdges;
+    std::set<std::pair<int, int>> usedEdgesPar1;
+    std::set<std::pair<int, int>> usedEdgesPar2;
+
+    /* Initialize arrays */
+    for (int i = 0; i < getNumVertices(); ++i) {
+        disjointSets.rank[i] = 0;
+        disjointSets.parent[i] = i;
+
+        degreeTemp[i] = 0;
+
+        if (i < getNumVertices() - 1) {
+            Edge e = parent1.spanningTree[i];
+            usedEdgesPar1.insert(std::make_pair(e.u, e.v));
+
+            e = parent2.spanningTree[i];
+            usedEdgesPar2.insert(std::make_pair(e.u, e.v));
+        }
+    }
+
+    /* Get all commom edges between spanningTree1 and spanningTree2 */
+    for (int i = 0; i < getNumVertices() - 1; ++i) {
+        Edge e = parent2.spanningTree[i];
+
+        if (usedEdgesPar1.find(std::make_pair(e.u, e.v)) != usedEdgesPar1.end()) {
+            /* insert edge belonging to spanningTree1 and spanningTree2*/
+            child.addEdge(e);
+            disjointSets.unionSets(e.u, e.v);
+            usedEdges.insert(std::make_pair(e.u, e.v));
+
+            ++degreeTemp[e.u];
+            ++degreeTemp[e.v];
+
+            ++edgesSpanTree;
+        } else {
+            edgesPar2.push_back(e); /* insert edge belonging only to spanningTree2 */
+        }
+
+        e = parent1.spanningTree[i];
+
+        if (usedEdgesPar2.find(std::make_pair(e.u, e.v)) == usedEdgesPar2.end()) {
+            edgesPar1.push_back(e); /* insert edge belonging only to spanningTree1 */
+        }
+    }
+
+    std::random_shuffle(edgesPar1.begin(), edgesPar1.end());
+    std::random_shuffle(edgesPar2.begin(), edgesPar2.end());
+
+    auto currEdgePar1 = edgesPar1.begin();
+    auto currEdgePar2 = edgesPar2.begin();
+
+    /* Get randomly edges from spanningTree1 and spanningTree2 */
+    while (edgesSpanTree < getNumVertices() - 1
+                && (currEdgePar1 != edgesPar1.end()
+                    || currEdgePar2 != edgesPar2.end())) {
+
+        Edge e;
+
+        if (currEdgePar1 != edgesPar1.end()
+            && currEdgePar2 != edgesPar2.end()) {
+
+            if (currEdgePar1->w < currEdgePar2->w) {
+                e = *currEdgePar1;
+            } else e = *currEdgePar2;
+
+            ++currEdgePar1;
+            ++currEdgePar2;
+        } else if (currEdgePar1 != edgesPar1.end()) {
+            e = *currEdgePar1;
+            currEdgePar1++;
+        } else {
+            e = *currEdgePar2;
+            currEdgePar2++;
+        }
+
+        /* Verify if edge was not already used and verify if degree constraints are satisfied */
+        if (degreeTemp[e.u] < degrees[e.u] && degreeTemp[e.v] < degrees[e.v] &&
+                                        disjointSets.find(e.u) != disjointSets.find(e.v)) {
+
+            ++degreeTemp[e.u];
+            ++degreeTemp[e.v];
+
+            bool treeUSaturated = true;
+            bool treeVSaturated = true;
+
+            /* Verify if the tree related with U and V are both nonsaturated */
+            for (int z = 0; z < getNumVertices(); ++z) {
+                if (degreeTemp[z] < degrees[z]) {
+                    if (disjointSets.find(e.u) == disjointSets.find(z)) {
+                        treeUSaturated = false;
+                    }
+
+                    if (disjointSets.find(e.v) == disjointSets.find(z)) {
+                        treeVSaturated = false;
+                    }
+                }
+            }
+
+            /* components in (E_1 U {e_k}) are non saturated then */
+            if (edgesSpanTree + 1 == getNumVertices() - 1 || treeUSaturated == false || treeVSaturated == false) {
+                child.addEdge(e);
+                disjointSets.unionSets(e.u, e.v);
+                usedEdges.insert(std::make_pair(e.u, e.v));
+
+                ++edgesSpanTree;
+            } else {
+                --degreeTemp[e.u];
+                --degreeTemp[e.v];
+            }
+        }
+    }
+
+    currEdgePar1 = edges.begin();
+    while (edgesSpanTree < getNumVertices() - 1 && currEdgePar1 != edges.end()) {
+        Edge &e = *currEdgePar1;
+
+        if (usedEdges.find(std::make_pair(e.u, e.v)) == usedEdges.end()) {
+            if (degreeTemp[e.u] < degrees[e.u] &&
+                degreeTemp[e.v] < degrees[e.v] &&
+                disjointSets.find(e.u) != disjointSets.find(e.v)) {
+
+                ++degreeTemp[e.u];
+                ++degreeTemp[e.v];
+
+                bool treeUSaturated = true;
+                bool treeVSaturated = true;
+
+                /* Verify if the tree related with U and V are both nonsaturated */
+                for (int z = 0; z < getNumVertices(); ++z) {
+                    if (degreeTemp[z] < degrees[z]) {
+                        if (disjointSets.find(e.u) == disjointSets.find(z)) {
+                            treeUSaturated = false;
+                        }
+
+                        if (disjointSets.find(e.v) == disjointSets.find(z)) {
+                            treeVSaturated = false;
+                        }
+                    }
+                }
+
+                /* components in (E_1 U {e_k}) are non saturated then */
+                if (edgesSpanTree + 1 == getNumVertices() - 1 || treeUSaturated == false || treeVSaturated == false) {
+                    child.addEdge(e);
+                    disjointSets.unionSets(e.u, e.v);
+                    usedEdges.insert(std::make_pair(e.u, e.v));
+
+                    ++edgesSpanTree;
+                } else {
+                    --degreeTemp[e.u];
+                    --degreeTemp[e.v];
+                }
+            }
+        }
+
+        currEdgePar1++;
+    }
+
+	return child;
 }
 
 /*
-Muta apenas 1 indivíduo (o tamanho da população é 500).
-A mutação é feita segundo a página 30 que são cálculos pesados talvez fora do escopo deste trabalho.
-Uma opção é ordenar as arestas que não estão na árvore, pegar a de menor custo que é viável e incluí-la na árvore, criando um ciclo.
-Remover deste ciclo uma aresta, criando uma árvore.
+Muta apenas 1 indivï¿½duo (o tamanho da populaï¿½ï¿½o ï¿½ 500).
+A mutaï¿½ï¿½o ï¿½ feita segundo a pï¿½gina 30 que sï¿½o cï¿½lculos pesados talvez fora do escopo deste trabalho.
+Uma opï¿½ï¿½o ï¿½ ordenar as arestas que nï¿½o estï¿½o na ï¿½rvore, pegar a de menor custo que ï¿½ viï¿½vel e incluï¿½-la na ï¿½rvore, criando um ciclo.
+Remover deste ciclo uma aresta, criando uma ï¿½rvore.
 */
-void DCMSTPMetaheuristic::mutate() {
-	// mutate sons
-	return;
+void DCMSTPMetaheuristic::mutate(Chromosome &child) {
+    std::default_random_engine generator;
+    std::set<std::pair<int, int>> usedEdges;
+    std::uniform_real_distribution<float> dist2(0, 1.0f);
+    std::uniform_int_distribution<int> dist(0, getNumVertices() - 2);
+
+    for(int i = 0; i < getNumVertices() - 1; ++i) {
+        Edge &e = child.spanningTree[i];
+        usedEdges.insert(std::make_pair(e.u, e.v));
+    }
+
+    int chosenEdge = dist(generator);
+
+    Edge &e = child.spanningTree[chosenEdge];
+
+    disjointSets.clean();
+    std::fill(degreeTemp.begin(), degreeTemp.end(), 0);
+
+    /* Find both trees and compute vertices degree for next step */
+    for(int j = 0; j < getNumVertices() - 1; ++j) {
+        if (chosenEdge != j) {
+            Edge ej = child.spanningTree[j];
+            degreeTemp[ej.u]++;
+            degreeTemp[ej.v]++;
+
+            disjointSets.unionSets(ej.u, ej.v);
+        }
+    }
+
+    Edge newEdge = e;
+    Edge oldEdge = e;
+
+    newEdge.w = std::numeric_limits<int>::max();
+
+    /* Select minimun cost edge that connects both
+     * trees without violating degree constraints */
+    auto currentEdge = edges.begin();
+    for(int j = 0; j < getNumEdges(); ++j) {
+        /* If selected edge is lighter than the removed one, switch */
+        if (currentEdge->w < newEdge.w
+            && degreeTemp[currentEdge->u] < degrees[currentEdge->u]
+            && degreeTemp[currentEdge->v] < degrees[currentEdge->v]
+            && disjointSets.find(currentEdge->u) != disjointSets.find(currentEdge->v)
+            && usedEdges.find(std::make_pair(currentEdge->u, currentEdge->v)) == usedEdges.end()) {
+
+            if (dist2(generator) < CROSS_PROB) {
+                newEdge = *currentEdge;
+            }
+        }
+
+        currentEdge++;
+    }
+
+    if (newEdge.u != oldEdge.u || newEdge.v != oldEdge.v) {
+        z_ub += newEdge.w;
+        z_ub -= oldEdge.w;
+
+        child.spanningTree[chosenEdge] = newEdge;
+
+        usedEdges.erase(std::make_pair(oldEdge.u, oldEdge.v));
+        usedEdges.insert(std::make_pair(newEdge.u, newEdge.v));
+    }
 }
 
 void DCMSTPMetaheuristic::solve() {
+    int iters = 0;
+    int maxIters = 1000;
+    std::default_random_engine generator;
+    int bestPrimal = std::numeric_limits<int>::max();
+    std::uniform_int_distribution<int> dist(0, POP_SIZE - 1);
 
-    int iters = 0, i, idx1, idx2;
-    maxIters = 10000;
-    std::vector<Chromosome> couple;
-    Chromosome x, y;
-    
     /* Step 1: Initialize population with random DCMST */
     // Tempo de inicilizar populacao aleatoria de tamanho 500 entre 4 e 5 segundos no felipe pc na instancia tb2ct500_3
 	initializePopulation();
-	
-	for(i = 0; i < POP_SIZE; i++) {
+
+	for(int i = 0; i < POP_SIZE; i++) {
+        bestPrimal = std::min(bestPrimal, population[i].fitness);
 		printf("Fitness do individuo %d: %d\n", i, population[i].fitness);
 	}
-    
+
 	/* Step 2: Recombine and mutate until stop criteria */
 	/* Better stop criteria propabably is when best individual isnt growing for too long */
     while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
-    	
     	/* Note: steps 2-X probably can be combined for optmization */
         /* Step 2-A: Select individuals that will recombine */
         /* New population should have size iguals to CROSS_PROB*POP_SIZE */
-        std::random_shuffle(population.begin(), population.end());
-        idx1 = 0;
-        idx2 = POP_SIZE-1;
-        for(i = 0; i < CROSS_PROB*POP_SIZE; i++) {
-        	
-        	/* Select 2 random individuals and choose the best*/
-			if(population[idx1].fitness < population[idx2].fitness)
-				x = population[idx1];
-            else
-            	x = population[idx2];
-            
-            /* Select 2 random individuals and choose the best*/
-			if(population[idx1].fitness < population[idx2].fitness)
-				y = population[idx1];
-            else
-            	y = population[idx2];
-            	
-			/* Step 2-B: Create new population with the parents chosen in 2-A*/	    	
-			sons[i] = crossover(x, y);
-			
-			++idx1;
-			--idx2;
-		}
-        /* Step 2-C: Mutate individuals resulted in 2-B */
-        /* Mutate only 1 individual */
-        mutate();
-        
-        /* Step 2-D: Replace worst individuals with the best of resulted in 2-C */
-		/* Sort population by fitness */
-		std::sort(population.begin(), population.end(), [&] (Chromosome &p1, Chromosome &p2) -> bool {
-        	return p1.fitness < p2.fitness;
-    	});
-    	for(i = 0; i < CROSS_PROB*POP_SIZE; i++) {
-    		population[i+(POP_SIZE-CROSS_PROB*POP_SIZE)] = sons[i];
-    	}
-    	
+
+        for(int i = 0; i < POP_SIZE; i++) {
+            int indexRand2;
+            int indexRand1 = i;
+
+            do indexRand2 = dist(generator);
+            while(indexRand2 == indexRand1);
+
+			/* Step 2-B: Create new population with the parents chosen in 2-A*/
+            Chromosome child;
+
+            if (population[indexRand1].fitness < population[indexRand2].fitness)
+                child = crossover(population[indexRand1], population[indexRand2]);
+            else child = crossover(population[indexRand2], population[indexRand1]);
+
+            /* Step 2-C: Mutate individuals resulted in 2-B */
+            /* Mutate only 1 individual */
+            mutate(child);
+
+            bestPrimal = std::min(bestPrimal, child.fitness);
+
+            printf("\tBest primal: %d --> %d\n", bestPrimal, child.fitness);
+            if (child.fitness < population[indexRand1].fitness && child.fitness < population[indexRand2].fitness) {
+                if (population[indexRand2].fitness > population[indexRand1].fitness) {
+                    population[indexRand2] = child;
+                } else population[indexRand1] = child;
+            }
+        }
+
         ++iters;
     }
+
+    printf("Best primal: %d\n", bestPrimal);
 }
