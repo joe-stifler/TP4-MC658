@@ -12,8 +12,8 @@
 
 #include <DCMSTPMetaheuristic.h>
 
-#define POP_SIZE 50    // size of initial population
-#define CROSS_PROB 0.5 // crossover probability
+#define POP_SIZE 500    // size of initial population
+#define CROSS_PROB 0.8 // crossover probability
 
 DCMSTPMetaheuristic::DCMSTPMetaheuristic(int _n, int _limitTime, clock_t _initialTime) : DCMSTP(_n, _limitTime, _initialTime) {
     degreeTemp.resize(_n);
@@ -85,24 +85,56 @@ void DCMSTPMetaheuristic::RandomKruskalX(Chromosome &individual, bool reduxEdges
 }
 
 // Tempo medio de geracao de 1 individuo eh 0.008116 segundos no felipe pc na instancia tb2ct500_3
-void DCMSTPMetaheuristic::initializePopulation() {
-    /* Generate POP_SIZE random individuals */
-	for(int i = 0; i < POP_SIZE; i++) {
-	    if (i == 0) {
-            std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
-                return e1.w < e2.w;
-            });
-
-            RandomKruskalX(population[i], true);
-	    } else {
-            std::random_shuffle(edges.begin(), edges.end());
-            RandomKruskalX(population[i], false);
-        }
-	}
-
+void DCMSTPMetaheuristic::initializePopulation(bool heuristicInicialization) {
+    
     std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
         return e1.w < e2.w;
     });
+	            
+	if(heuristicInicialization == false) {
+
+		/* Generate POP_SIZE random individuals */
+		for(int i = 0; i < POP_SIZE; i++) {
+		    if (i == 0) {
+	            RandomKruskalX(population[i], true);
+		    } else {
+	            std::random_shuffle(edges.begin(), edges.end());
+	            RandomKruskalX(population[i], false);
+	        }
+		}
+		
+		std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
+        	return e1.w < e2.w;
+    	});
+	}
+	
+	else {
+
+		float alpha = 1.5/(500/POP_SIZE); //paper: alpha = 1.5 for pop_size = 500
+		int k;
+		int n = getNumVertices();
+		std::default_random_engine generator;
+		std::uniform_int_distribution<int> dist(0, getNumEdges() - 1);
+				
+	    RandomKruskalX(population[0], true);
+	            
+		for(int i = 1; i < POP_SIZE; i++) {
+	
+			k = (int) alpha*i*n/POP_SIZE; //
+			
+			/* Shuffle k cheapest edges */
+			while(k > 0) {
+				int randEdge = dist(generator);
+				std::swap(edges[k],edges[randEdge]);
+				k--;
+			}
+	        RandomKruskalX(population[i], false);
+	        
+	        std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
+	        	return e1.w < e2.w;
+	   		});
+	    }
+	}
 }
 
 /*
@@ -113,8 +145,8 @@ Caso necess�rio, completar a �rvore com arestas que n�o pertencem a nenhum
 */
 Chromosome DCMSTPMetaheuristic::crossover(Chromosome &parent1, Chromosome &parent2) {
 	Chromosome child;
-    std::default_random_engine generator;
-    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    //std::default_random_engine generator;
+    //std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
     int edgesSpanTree = 0;
 
@@ -332,9 +364,9 @@ void DCMSTPMetaheuristic::mutate(Chromosome &child) {
             && disjointSets.find(currentEdge->u) != disjointSets.find(currentEdge->v)
             && usedEdges.find(std::make_pair(currentEdge->u, currentEdge->v)) == usedEdges.end()) {
 
-            if (dist2(generator) < CROSS_PROB) {
-                newEdge = *currentEdge;
-            }
+            //if (dist2(generator) < CROSS_PROB) {
+            newEdge = *currentEdge;
+            //}
         }
 
         currentEdge++;
@@ -345,6 +377,8 @@ void DCMSTPMetaheuristic::mutate(Chromosome &child) {
         z_ub -= oldEdge.w;
 
         child.spanningTree[chosenEdge] = newEdge;
+        child.fitness += newEdge.w;
+        child.fitness -= oldEdge.w;
 
         usedEdges.erase(std::make_pair(oldEdge.u, oldEdge.v));
         usedEdges.insert(std::make_pair(newEdge.u, newEdge.v));
@@ -353,55 +387,97 @@ void DCMSTPMetaheuristic::mutate(Chromosome &child) {
 
 void DCMSTPMetaheuristic::solve() {
     int iters = 0;
-    int maxIters = 1000;
+    int maxIters = 100000;
     std::default_random_engine generator;
     int bestPrimal = std::numeric_limits<int>::max();
     std::uniform_int_distribution<int> dist(0, POP_SIZE - 1);
 
     /* Step 1: Initialize population with random DCMST */
-    // Tempo de inicilizar populacao aleatoria de tamanho 500 entre 4 e 5 segundos no felipe pc na instancia tb2ct500_3
-	initializePopulation();
+    bool heuristicInicialization = true;
+	initializePopulation(heuristicInicialization);
 
 	for(int i = 0; i < POP_SIZE; i++) {
         bestPrimal = std::min(bestPrimal, population[i].fitness);
-		printf("Fitness do individuo %d: %d\n", i, population[i].fitness);
+		//printf("Fitness do individuo %d: %d\n", i, population[i].fitness);
 	}
-
+	printf("Best primal da geracao %d: %d\n", iters, bestPrimal);	
+	std::vector<Chromosome> child;
+	child.resize(POP_SIZE*CROSS_PROB);
+	
 	/* Step 2: Recombine and mutate until stop criteria */
 	/* Better stop criteria propabably is when best individual isnt growing for too long */
     while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
-    	/* Note: steps 2-X probably can be combined for optmization */
+
+		/* Sort generation by fitness */
+		std::sort(population.begin(), population.end(), [&] (Chromosome &p1, Chromosome &p2) -> bool {
+        	return p1.fitness < p2.fitness;
+    	});
+    	
         /* Step 2-A: Select individuals that will recombine */
         /* New population should have size iguals to CROSS_PROB*POP_SIZE */
-
-        for(int i = 0; i < POP_SIZE; i++) {
+        for(int i = 0; i < POP_SIZE*CROSS_PROB; i++) {
+        	Chromosome parent1;
+        	Chromosome parent2;
+            int indexRand1 = dist(generator);
             int indexRand2;
-            int indexRand1 = i;
 
             do indexRand2 = dist(generator);
             while(indexRand2 == indexRand1);
-
+            
+			if (population[indexRand1].fitness < population[indexRand2].fitness)
+                parent1 = population[indexRand1];
+            else parent1 = population[indexRand2];
+			
+			indexRand1 = dist(generator);
+			do indexRand2 = dist(generator);
+            while(indexRand2 == indexRand1);
+            
+			if (population[indexRand1].fitness < population[indexRand2].fitness)
+                parent2 = population[indexRand1];
+            else parent2 = population[indexRand2];
+            
 			/* Step 2-B: Create new population with the parents chosen in 2-A*/
-            Chromosome child;
+            child[i] = crossover(population[indexRand1], population[indexRand2]);
 
-            if (population[indexRand1].fitness < population[indexRand2].fitness)
-                child = crossover(population[indexRand1], population[indexRand2]);
-            else child = crossover(population[indexRand2], population[indexRand1]);
+            /*if (population[indexRand1].fitness < population[indexRand2].fitness)
+                child[i] = crossover(population[indexRand1], population[indexRand2]);
+            else child[i] = crossover(population[indexRand2], population[indexRand1]);*/
 
             /* Step 2-C: Mutate individuals resulted in 2-B */
             /* Mutate only 1 individual */
-            mutate(child);
+            if(i == 0)
+            	mutate(child[i]);
 
-            bestPrimal = std::min(bestPrimal, child.fitness);
+            //bestPrimal = std::min(bestPrimal, child.fitness);
 
-            printf("\tBest primal: %d --> %d\n", bestPrimal, child.fitness);
+			/* Step 2-D: Replace worst population with the children */
+			/* If it was done here children could reproduce with parents in next iteration */
+			//population[i+(POP_SIZE-CROSS_PROB*POP_SIZE)] = child[i];
+			
+            /*printf("\tBest primal: %d --> %d\n", bestPrimal, child.fitness);
             if (child.fitness < population[indexRand1].fitness && child.fitness < population[indexRand2].fitness) {
                 if (population[indexRand2].fitness > population[indexRand1].fitness) {
                     population[indexRand2] = child;
                 } else population[indexRand1] = child;
-            }
+            }*/
         }
+        
+        /* Step 2-D: Replace worst population with the children */
+		for(int i = 0; i < POP_SIZE*CROSS_PROB; i++) {
+			/* Should only replace if it does not duplicate an existing solution */
+			population[i+(POP_SIZE-CROSS_PROB*POP_SIZE)] = child[i];
+			bestPrimal = std::min(bestPrimal, child[i].fitness);
+		}
 
+		//if(iters % 100 == 0) {
+		
+			//for(int i = 0; i < POP_SIZE; i++) {
+        		//bestPrimal = std::min(bestPrimal, population[i].fitness);
+				//printf("Fitness do individuo %d: %d\n", i, population[i].fitness);
+			//}
+			printf("Best primal da geracao %d: %d\n", iters, bestPrimal);		
+		//}
+			
         ++iters;
     }
 

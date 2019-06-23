@@ -44,7 +44,7 @@ private:
     std::vector<Chromosome> population;
 
     void mutate(Chromosome &);
-    void initializePopulation();
+    void initializePopulation(bool);
     void RandomKruskalX(Chromosome &, bool);
     Chromosome crossover(Chromosome &, Chromosome &);
 
