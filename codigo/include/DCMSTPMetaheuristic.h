@@ -37,7 +37,7 @@ public:
     void solve() override;
 
 private:
-    int z_ub;
+    int POP_SIZE = int(150000/getNumVertices());
     DisjointSets disjointSets;
     std::vector<int> degreeTemp;
     std::vector<Chromosome> sons;
