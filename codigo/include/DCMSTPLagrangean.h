@@ -46,6 +46,7 @@ private:
     std::vector<bool> vertexInTree;
     std::vector<Edge> spanningTree;
     std::vector<Edge> degSpanningTree;
+    std::vector<Edge> bestSpanningTree;
     std::vector<Edge> spanningTreeTemp;
     std::vector<float> lagrangeanMultipliers;
     

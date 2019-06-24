@@ -20,6 +20,7 @@ DCMSTPLagrangean::DCMSTPLagrangean(int _n, int _limitTime, clock_t _initialTime)
     disjointSets.initialize(_n);
     disjointDegSets.initialize(_n);
     degSpanningTree.resize(_n - 1);
+    bestSpanningTree.resize(_n - 1);
     spanningTreeTemp.resize(_n - 1);
     lagrangeanMultipliers.resize(_n);
 }
@@ -69,32 +70,26 @@ void DCMSTPLagrangean::kruskalx(bool shouldRedux) {
             if (disjointSets.find(u) != disjointSets.find(v)) {
                 disjointSets.unionSets(u, v);
 
-                /* Step 3: Updates subgradient */
-                subgradient[currentEdge->u] += 1;
-                subgradient[currentEdge->v] += 1;
+                /* Step 3: Updates subgradient and lower bound (update related with edges) */
+                subgradient[u] += 1;
+                subgradient[v] += 1;
 
-                if (vertexInTree[currentEdge->u] == false) {
-                    vertexInTree[currentEdge->u] = true;
+                z_lb += (currentEdge->w + lagrangeanMultipliers[u] + lagrangeanMultipliers[v]);
 
-                    /* Step 3: Updates subgradient */
-                    subgradient[currentEdge->u] -= 1 * degrees[currentEdge->u];
-
+                /* Updates subgradient and lower bound (update related with vertices) */
+                if (vertexInTree[u] == false) {
+                    vertexInTree[u] = true;
+                    subgradient[u] -= 1 * degrees[u];
                     /* Step 4: Calculates current lower bound */
-                    z_lb -= lagrangeanMultipliers[currentEdge->u] * degrees[currentEdge->u];
+                    z_lb -= lagrangeanMultipliers[u] * degrees[u];
                 }
 
-                if (vertexInTree[currentEdge->v] == false) {
-                    vertexInTree[currentEdge->v] = true;
-
-                    /* Step 3: Updates subgradient */
-                    subgradient[currentEdge->v] -= 1 * degrees[currentEdge->v];
-
+                if (vertexInTree[v] == false) {
+                    vertexInTree[v] = true;
+                    subgradient[v] -= 1 * degrees[v];
                     /* Step 4: Calculates current lower bound */
-                    z_lb -= lagrangeanMultipliers[currentEdge->v] * degrees[currentEdge->v];
+                    z_lb -= lagrangeanMultipliers[v] * degrees[v];
                 }
-
-                /* Step 4: Calculates current lower bound */
-                z_lb += (currentEdge->w + lagrangeanMultipliers[currentEdge->u] + lagrangeanMultipliers[currentEdge->v]);
 
                 spanningTree[edgesSpanTree] = *currentEdge;
                 ++edgesSpanTree;
@@ -102,8 +97,6 @@ void DCMSTPLagrangean::kruskalx(bool shouldRedux) {
         }
 
         if (edgesDegSpanTree < getNumVertices() - 1) {
-            ++kDeg;
-
             if (degreeTemp[u] < degrees[u] && degreeTemp[v] < degrees[v]
                         && disjointDegSets.find(u) != disjointDegSets.find(v)) {
 
@@ -141,11 +134,23 @@ void DCMSTPLagrangean::kruskalx(bool shouldRedux) {
             }
         }
 
+        ++kDeg;
         currentEdge++;
     }
 
+    subgradientNorm = 0.0f;
+    /* calculates 2-norm of subgradient vector */
+    for (int i = 0; i < getNumVertices(); ++i) {
+        subgradientNorm += pow(subgradient[i], 2.0f);
+    }
+
+    if (edgesDegSpanTree < getNumVertices() - 1) {
+        if (currentEdge == edges.end()) printf("\treally reached the end!\n");
+        printf("Number of edges in the tree not reached: %d %d\n", edgesDegSpanTree, getNumVertices() - 1);
+    }
+
     if (shouldRedux) {
-        edges.resize(std::min(2 * kDeg, (int) edges.size()));
+        edges.resize(std::min((int) 4 * kDeg, (int) edges.size()));
     }
 }
 
@@ -157,15 +162,20 @@ void DCMSTPLagrangean::improvementProcedure() {
         usedEdges.insert(std::make_pair(e.u, e.v));
     }
 
-	for(int i = 0; i < getNumVertices() - 1; ++i) {
-		Edge &e = degSpanningTree[i];
+    std::sort(degSpanningTree.begin(), degSpanningTree.end(), [&] (Edge &e1, Edge &e2) -> bool {
+        return e1.w > e2.w;
+    });
+
+    for (int edgeIndex = 0; edgeIndex < getNumVertices() - 1; ++edgeIndex) {
+        Edge e = degSpanningTree[edgeIndex];
 
         disjointDegSets.clean();
         std::fill(degreeTemp.begin(), degreeTemp.end(), 0);
 
         /* Find both trees and compute vertices degree for next step */
         for(int j = 0; j < getNumVertices() - 1; ++j) {
-		    if (i != j) {
+            Edge ek = degSpanningTree[j];
+            if (ek.u != e.u || ek.v != e.v) {
                 degreeTemp[degSpanningTree[j].u]++;
                 degreeTemp[degSpanningTree[j].v]++;
 
@@ -175,6 +185,8 @@ void DCMSTPLagrangean::improvementProcedure() {
 
         Edge newEdge = e;
         Edge oldEdge = e;
+
+        usedEdges.erase(std::make_pair(e.u, e.v));
 
         /* Select minimun cost edge that connects both
          * trees without violating degree constraints */
@@ -196,11 +208,10 @@ void DCMSTPLagrangean::improvementProcedure() {
             z_ub += newEdge.w;
             z_ub -= oldEdge.w;
 
-            degSpanningTree[i] = newEdge;
-
-            usedEdges.erase(std::make_pair(oldEdge.u, oldEdge.v));
-            usedEdges.insert(std::make_pair(newEdge.u, newEdge.v));
+            degSpanningTree[edgeIndex] = newEdge;
         }
+
+        usedEdges.insert(std::make_pair(newEdge.u, newEdge.v));
  	}
 }
 
@@ -208,7 +219,7 @@ void DCMSTPLagrangean::solve() {
     int iters = 0;
     float beta = 0.0f;
     float alpha = 2.0f;
-    int maxIters = 10000000;
+    int maxIters = 2000000;
     int bestPrimal = std::numeric_limits<int>::max();
     float bestDual = std::numeric_limits<float>::min();
 
@@ -218,27 +229,39 @@ void DCMSTPLagrangean::solve() {
     kruskalx(true);
     improvementProcedure();
 
+    if (bestPrimal >= z_ub) {
+        bestPrimal = z_ub;
+        bestSpanningTree = degSpanningTree;
+    }
+
     bestDual = std::max(bestDual, z_lb);
-    bestPrimal = std::min(bestPrimal, z_ub);
+
+    int notImproved = 0;
 
     while (bestPrimal - bestDual >= 1.0f && iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
         /* Step 2: Solves MSTP with lagrangean multipliers added to the edges */
         kruskalx(false);
 
-        if (iters % 100 == 0) {
-            improvementProcedure();
-            printf("z_lb (%d) : %f  --  %d\n", iters, z_lb, z_ub);
+        if (iters % 1000 == 0) {
+            printf("z_lb (%d) : %f  --  %d\t\t(%f     %d)\n", iters, z_lb, z_ub, bestDual, bestPrimal);
         }
 
         bestDual = std::max(bestDual, z_lb);
 
+
         if (bestPrimal >= z_ub) {
             improvementProcedure();
-            bestPrimal = std::min(bestPrimal, z_ub);
-        }
 
-        /* calculates 2-norm of subgradient vector */
-        subgradientNorm = std::inner_product(subgradient.begin(), subgradient.end(), subgradient.begin(), 0.0f);
+//            alpha = 2.0f;
+            notImproved = 0;
+            bestPrimal = z_ub;
+            bestSpanningTree = degSpanningTree;
+        } else ++notImproved;
+
+        if (notImproved > 500) {
+            alpha /= 1.5f;
+            alpha = std::max(1.0f, alpha);
+        }
 
         if (subgradientNorm < 1e-10) break;
 
@@ -253,5 +276,38 @@ void DCMSTPLagrangean::solve() {
         ++iters;
     }
 
-    printf("max lb, ub: %f -- %d\n", bestDual, bestPrimal);
+    /* Verify if is a valid solution */
+    /* Initialize arrays */
+    for (int i = 0; i < getNumVertices(); ++i) {
+        disjointSets.rank[i] = 0;
+        disjointSets.parent[i] = i;
+
+        degreeTemp[i] = 0;
+    }
+
+    int totalCost = 0;
+    std::set<std::pair<int, int>> usedEdges;
+    for (int i = 0; i < getNumVertices() - 1; ++i) {
+        Edge e = bestSpanningTree[i];
+
+        totalCost += e.w;
+        disjointSets.unionSets(e.u, e.v);
+        usedEdges.insert(std::make_pair(e.u, e.v));
+    }
+
+    bool validSolution = true;
+    for (int i = 0; i < getNumVertices(); ++i) {
+        for (int j = 0; j < getNumVertices(); ++j) {
+            if (disjointSets.find(i) != disjointSets.find(j)) {
+                validSolution = false;
+            }
+        }
+    }
+
+    if (usedEdges.size() != getNumVertices() - 1) validSolution = false;
+
+    if(validSolution)
+        printf("VALID Solution -> Best primal: %d (dual %f)\n", totalCost, bestDual);
+    else printf("INVALID Solution\n");
 }
+
