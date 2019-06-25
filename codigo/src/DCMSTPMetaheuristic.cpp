@@ -485,5 +485,56 @@ void DCMSTPMetaheuristic::solve() {
         ++iters;
     }
 
-    printf("Numero de geracoes: %d\nBest primal: %d\n", iters, bestPrimal);
+	/* Verify if is a valid solution */
+
+    int k;
+    std::set<std::pair<int, int>> usedEdges;
+	int invalidSolution = 0;
+	
+	for(k = 0; k < POP_SIZE; k++) {
+
+		/* Initialize arrays */
+	    for (int i = 0; i < getNumVertices(); ++i) {
+	        disjointSets.rank[i] = 0;
+	        disjointSets.parent[i] = i;
+	
+	        degreeTemp[i] = 0;
+	    }
+	    
+	    for (int i = 0; i < getNumVertices() - 1; ++i) {
+	        Edge e = population[k].spanningTree[i];
+	
+	        disjointSets.unionSets(e.u, e.v);
+	        usedEdges.insert(std::make_pair(e.u, e.v));
+	        degreeTemp[e.u]++;
+	        degreeTemp[e.v]++;
+	    }
+	
+		if (usedEdges.size() != getNumVertices() - 1) {
+			invalidSolution++;
+			printf("Erro por tamanho da arvore\n");
+			continue;
+		}
+	    
+	    for (int i = 0; i < getNumVertices(); ++i) {
+	    	if(degreeTemp[i] > degrees[i]) {
+	    		invalidSolution++;
+	            printf("Erro por restricao de grau\n");
+	            break;
+			}
+			
+	        for (int j = 0; j < getNumVertices(); ++j) {
+	            if (disjointSets.find(i) != disjointSets.find(j)) {
+	                invalidSolution++;
+	                printf("Erro por nao ser arvore\n");
+	                goto next;
+	            }
+	        }
+	    }
+	    next:
+	    	usedEdges.clear();
+	}
+	
+	printf("Numero de solucoes invalidas: %d\n", invalidSolution);
+    printf("Tamanho da populacao: %d\nNumero de geracoes: %d\nBest primal: %d\n", POP_SIZE, iters, bestPrimal);
 }
