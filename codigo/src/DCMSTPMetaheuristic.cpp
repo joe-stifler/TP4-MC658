@@ -16,9 +16,20 @@
 #define CROSS_PROB 0.8 // crossover probability
 
 DCMSTPMetaheuristic::DCMSTPMetaheuristic(int _n, int _limitTime, clock_t _initialTime) : DCMSTP(_n, _limitTime, _initialTime) {
+    POP_SIZE = int(150000 / _n);
+
     degreeTemp.resize(_n);
     disjointSets.initialize(_n);
     population.resize(POP_SIZE);
+
+}
+
+void DCMSTPMetaheuristic::printSolution(std::string pathName) {
+    printf("%s, %d (%lfs)\n", pathName.c_str(), getBestPrimal(), GET_TIME(initialTime, clock()));
+}
+
+int DCMSTPMetaheuristic::getBestPrimal() {
+    return bestPrimal;
 }
 
 void DCMSTPMetaheuristic::RandomKruskalX(Chromosome &individual, bool reduxEdges) {
@@ -46,7 +57,7 @@ void DCMSTPMetaheuristic::RandomKruskalX(Chromosome &individual, bool reduxEdges
 
             ++degreeTemp[u];
             ++degreeTemp[v];
-			
+
             bool treeUSaturated = true;
             bool treeVSaturated = true;
 
@@ -86,11 +97,11 @@ void DCMSTPMetaheuristic::RandomKruskalX(Chromosome &individual, bool reduxEdges
 
 // Tempo medio de geracao de 1 individuo eh 0.008116 segundos no felipe pc na instancia tb2ct500_3
 void DCMSTPMetaheuristic::initializePopulation(bool heuristicInicialization) {
-    
+
     std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
         return e1.w < e2.w;
     });
-	            
+
 	if(heuristicInicialization == false) {
 
 		/* Generate POP_SIZE random individuals */
@@ -102,12 +113,12 @@ void DCMSTPMetaheuristic::initializePopulation(bool heuristicInicialization) {
 	            RandomKruskalX(population[i], false);
 	        }
 		}
-		
+
 		std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
         	return e1.w < e2.w;
     	});
 	}
-	
+
 	else {
 
 		float alpha = 1.5;///((float)500/POP_SIZE); //paper: alpha = 1.5 for pop_size = 500
@@ -117,13 +128,13 @@ void DCMSTPMetaheuristic::initializePopulation(bool heuristicInicialization) {
 		std::default_random_engine generator;
 		std::uniform_int_distribution<int> dist(0, getNumEdges() - 1);
 		int randEdge;
-				
+
 	    RandomKruskalX(population[0], true);
-	            
+
 		for(int i = 1; i < POP_SIZE; i++) {
-	
+
 			k = (int) (alpha*i*n/POP_SIZE);
-			
+
 			/* Shuffle k cheapest edges */
 			int j = 0;
 			while(k > 0) {
@@ -134,7 +145,7 @@ void DCMSTPMetaheuristic::initializePopulation(bool heuristicInicialization) {
 				j++;
 			}
 	        RandomKruskalX(population[i], false);
-	        
+
 	        std::sort(edges.begin(), edges.end(), [&] (Edge &e1, Edge &e2) -> bool {
 	        	return e1.w < e2.w;
 	   		});
@@ -388,38 +399,82 @@ void DCMSTPMetaheuristic::mutate(Chromosome &child) {
     }
 }
 
-void DCMSTPMetaheuristic::solve() {
+bool DCMSTPMetaheuristic::testViability(std::vector<Edge> &spanningTreeAux, int &totalCost) {
+    /* Verify if is a valid solution */
+    /* Initialize arrays */
+    for (int i = 0; i < getNumVertices(); ++i) {
+        disjointSets.rank[i] = 0;
+        disjointSets.parent[i] = i;
 
-    int iters = 0;
-    int maxIters = 1000000;
+        degreeTemp[i] = 0;
+    }
+
+    totalCost = 0;
+    std::set<std::pair<int, int>> usedEdges;
+    for (int i = 0; i < getNumVertices() - 1; ++i) {
+        Edge e = spanningTreeAux[i];
+
+        totalCost += e.w;
+
+        degreeTemp[e.u]++;
+        degreeTemp[e.v]++;
+        disjointSets.unionSets(e.u, e.v);
+        usedEdges.insert(std::make_pair(e.u, e.v));
+    }
+
+    bool validSolution = true;
+    for (int i = 0; i < getNumVertices(); ++i) {
+        if (degreeTemp[i] > degrees[i]) return false;
+
+        for (int j = 0; j < getNumVertices(); ++j) {
+            if (disjointSets.find(i) != disjointSets.find(j)) {
+                return false;
+            }
+        }
+    }
+
+    if (usedEdges.size() != getNumVertices() - 1) return false;
+
+    return true;
+}
+
+void DCMSTPMetaheuristic::solve() {
     std::default_random_engine generator;
-    int bestPrimal = std::numeric_limits<int>::max();
     std::uniform_int_distribution<int> dist(0, POP_SIZE - 1);
+
+    bestPrimal = std::numeric_limits<int>::max();
 
     /* Step 1: Initialize population with random DCMST */
     bool heuristicInicialization = false;
 	initializePopulation(heuristicInicialization);
 
 	for(int i = 0; i < POP_SIZE; i++) {
-        bestPrimal = std::min(bestPrimal, population[i].fitness);
-		//printf("Fitness do individuo %d: %d\n", i, population[i].fitness);
+        if (bestPrimal > population[i].fitness) {
+            int auxCost = 0;
+            if (testViability(population[i].spanningTree, auxCost)) {
+                if (bestPrimal > auxCost) {
+                    bestPrimal = auxCost;
+                    bestSpanningTree = population[i].spanningTree;
+                }
+            }
+        }
 	}
-	printf("Best primal da geracao %d: %d\n", iters, bestPrimal);
+
 	std::vector<Chromosome> child;
 	child.resize(int(POP_SIZE*CROSS_PROB));
-	
+
 	/* Step 2: Recombine and mutate until stop criteria */
 	/* Better stop criteria propabably is when best individual isnt growing for too long */
-    while (iters < maxIters && GET_TIME(initialTime, clock()) < limitTime) {
+    while (GET_TIME(initialTime, clock()) < limitTime) {
 
 		/* Sort generation by fitness */
 		std::sort(population.begin(), population.end(), [&] (Chromosome &p1, Chromosome &p2) -> bool {
         	return p1.fitness < p2.fitness;
     	});
-    	
+
         /* Step 2-A: Select individuals that will recombine */
         /* New population should have size iguals to CROSS_PROB*POP_SIZE */
-        for(int i = 0; i < int(POP_SIZE*CROSS_PROB); i++) {
+        for(int i = 0; i < int(POP_SIZE*CROSS_PROB) && GET_TIME(initialTime, clock()) < limitTime; i++) {
         	Chromosome parent1;
         	Chromosome parent2;
             int indexRand1 = dist(generator);
@@ -427,19 +482,19 @@ void DCMSTPMetaheuristic::solve() {
 
             do indexRand2 = dist(generator);
             while(indexRand2 == indexRand1);
-            
+
 			if (population[indexRand1].fitness < population[indexRand2].fitness)
                 parent1 = population[indexRand1];
             else parent1 = population[indexRand2];
-			
+
 			indexRand1 = dist(generator);
 			do indexRand2 = dist(generator);
             while(indexRand2 == indexRand1);
-            
+
 			if (population[indexRand1].fitness < population[indexRand2].fitness)
                 parent2 = population[indexRand1];
             else parent2 = population[indexRand2];
-            
+
 			/* Step 2-B: Create new population with the parents chosen in 2-A*/
             child[i] = crossover(population[indexRand1], population[indexRand2]);
 
@@ -449,15 +504,12 @@ void DCMSTPMetaheuristic::solve() {
 
             /* Step 2-C: Mutate individuals resulted in 2-B */
             /* Mutate only 1 individual */
-            if(i % 500 == 0)
-            	mutate(child[i]);
-
-            //bestPrimal = std::min(bestPrimal, child.fitness);
+            if(i % 500 == 0) mutate(child[i]);
 
 			/* Step 2-D: Replace worst population with the children */
 			/* If it was done here children could reproduce with parents in next iteration */
 			//population[i+(POP_SIZE-CROSS_PROB*POP_SIZE)] = child[i];
-			
+
             /*printf("\tBest primal: %d --> %d\n", bestPrimal, child.fitness);
             if (child.fitness < population[indexRand1].fitness && child.fitness < population[indexRand2].fitness) {
                 if (population[indexRand2].fitness > population[indexRand1].fitness) {
@@ -465,76 +517,39 @@ void DCMSTPMetaheuristic::solve() {
                 } else population[indexRand1] = child;
             }*/
         }
-        
+
         /* Step 2-D: Replace worst population with the children */
-		for(int i = 0; i < int(POP_SIZE*CROSS_PROB);i++) {
+		for(int i = 0; i < int(POP_SIZE*CROSS_PROB) && GET_TIME(initialTime, clock()) < limitTime; ++i) {
 			/* Should only replace if it does not duplicate an existing solution */
 			population[i+(POP_SIZE-int(CROSS_PROB*POP_SIZE))] = child[i];
-			bestPrimal = std::min(bestPrimal, child[i].fitness);
-		}
 
-		//if(iters % 10 == 0) {
-		
-			//for(int i = 0; i < POP_SIZE; i++) {
-        		//bestPrimal = std::min(bestPrimal, population[i].fitness);
-				//printf("Fitness do individuo %d: %d\n", i, population[i].fitness);
-			//}
-			//printf("Best primal da geracao %d: %d\n", iters, bestPrimal);		
-		//}
-			
-        ++iters;
+            int auxCost = 0;
+            if (testViability(child[i].spanningTree, auxCost)) {
+                if (bestPrimal > auxCost) {
+                    bestPrimal = auxCost;
+                    bestSpanningTree = child[i].spanningTree;
+                }
+            }
+		}
+    }
+}
+
+void DCMSTPMetaheuristic::saveBestEdges(std::string pathName) {
+    FILE *file = fopen((pathName + ".out").c_str(), "w+");
+
+    if (file == nullptr) return;
+
+    for (int v = 0; v < getNumVertices() - 1; ++v) {
+        Edge e = bestSpanningTree[v];
+
+        if (e.u > e.v) {
+            int aux = e.u;
+            e.u = e.v;
+            e.v = aux;
+        }
+
+        fprintf(file, "%d %d\n", e.u, e.v);
     }
 
-	/* Verify if is a valid solution */
-
-    int k;
-    std::set<std::pair<int, int>> usedEdges;
-	int invalidSolution = 0;
-	
-	for(k = 0; k < POP_SIZE; k++) {
-
-		/* Initialize arrays */
-	    for (int i = 0; i < getNumVertices(); ++i) {
-	        disjointSets.rank[i] = 0;
-	        disjointSets.parent[i] = i;
-	
-	        degreeTemp[i] = 0;
-	    }
-	    
-	    for (int i = 0; i < getNumVertices() - 1; ++i) {
-	        Edge e = population[k].spanningTree[i];
-	
-	        disjointSets.unionSets(e.u, e.v);
-	        usedEdges.insert(std::make_pair(e.u, e.v));
-	        degreeTemp[e.u]++;
-	        degreeTemp[e.v]++;
-	    }
-	
-		if (usedEdges.size() != getNumVertices() - 1) {
-			invalidSolution++;
-			printf("Erro por tamanho da arvore\n");
-			continue;
-		}
-	    
-	    for (int i = 0; i < getNumVertices(); ++i) {
-	    	if(degreeTemp[i] > degrees[i]) {
-	    		invalidSolution++;
-	            printf("Erro por restricao de grau\n");
-	            break;
-			}
-			
-	        for (int j = 0; j < getNumVertices(); ++j) {
-	            if (disjointSets.find(i) != disjointSets.find(j)) {
-	                invalidSolution++;
-	                printf("Erro por nao ser arvore\n");
-	                goto next;
-	            }
-	        }
-	    }
-	    next:
-	    	usedEdges.clear();
-	}
-	
-	printf("Numero de solucoes invalidas: %d\n", invalidSolution);
-    printf("Tamanho da populacao: %d\nNumero de geracoes: %d\nBest primal: %d\n", POP_SIZE, iters, bestPrimal);
+    fclose(file);
 }

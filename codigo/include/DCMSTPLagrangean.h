@@ -35,9 +35,19 @@ public:
 
     void solve() override;
 
+    int getBestPrimal() override;
+
+    float getBestDual() override;
+
+    void printSolution(std::string) override;
+
+    void saveBestEdges(std::string) override;
+
 private:
     int z_ub;
     float z_lb;
+    int bestPrimal;
+    float bestDual;
     float subgradientNorm;
     DisjointSets disjointSets;
     std::vector<int> degreeTemp;
@@ -52,6 +62,7 @@ private:
     
     void improvementProcedure();
     void kruskalx(bool shouldRedux);
+    bool testViability(std::vector<Edge> &spanningTreeAux, int &totalCost);
 };
 
 #endif // TP4_DCMSTPLAGRANGEAN_H

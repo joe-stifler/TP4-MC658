@@ -41,6 +41,20 @@ int DCMSTP::getNumVertices() {
     return degrees.size();
 }
 
+void DCMSTP::printSolution(std::string) {}
+
+int DCMSTP::getBestPrimal() {
+    return -1;
+}
+
+float DCMSTP::getBestDual() {
+    return -1.0f;
+}
+
 void DCMSTP::solve() {
+    printf("Solver Error: Virtual function call. Not implemented yet.");
+}
+
+void DCMSTP::saveBestEdges(std::string) {
     printf("Solver Error: Virtual function call. Not implemented yet.");
 }

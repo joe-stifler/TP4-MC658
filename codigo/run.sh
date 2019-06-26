@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make -j
+#make -j
 
-./dcmstp-solver ../instancias/tb2ct500_1.txt 30 m
+./dcmstp-solver ../instancias/$3 $2 $1
 

@@ -36,18 +36,26 @@ public:
 
     void solve() override;
 
+    int getBestPrimal() override;
+
+    void printSolution(std::string) override;
+
+    void saveBestEdges(std::string) override;
+
 private:
-    int POP_SIZE = int(150000/getNumVertices());
+    int POP_SIZE;
+    int bestPrimal;
     DisjointSets disjointSets;
     std::vector<int> degreeTemp;
     std::vector<Chromosome> sons;
     std::vector<Chromosome> population;
+    std::vector<Edge> bestSpanningTree;
 
     void mutate(Chromosome &);
     void initializePopulation(bool);
     void RandomKruskalX(Chromosome &, bool);
     Chromosome crossover(Chromosome &, Chromosome &);
-
+    bool testViability(std::vector<Edge> &spanningTreeAux, int &totalCost);
 };
 
 #endif // TP4_DCMSTPMETAHEURISTIC_H

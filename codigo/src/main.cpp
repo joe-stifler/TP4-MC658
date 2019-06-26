@@ -59,7 +59,7 @@ int main(int argc, const char **argv) {
 			return 1;
 		}
 
-		if (solver) {
+		if (solver.get()) {
 			/* Reads all edges */
 			while (m--) {
 				std::getline(instanceFile, line);
@@ -81,6 +81,10 @@ int main(int argc, const char **argv) {
 			}
 
 			solver->solve();
+
+			solver->saveBestEdges(std::string(argv[1]));
+
+            solver->printSolution(std::string(argv[1]));
 		} else {
 			printf("Some error occurred during DCMSTP memory class allocation.\n");
 

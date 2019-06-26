@@ -52,7 +52,16 @@ public:
      * current edges */
     void removeAllEdges();
 
+    virtual void printSolution(std::string);
+
+    virtual int getBestPrimal();
+
+    virtual float getBestDual();
+
+    virtual void saveBestEdges(std::string);
+
 protected:
+
     clock_t initialTime;
     float limitTime; /* Limit of execution in seconds */
     std::vector<Edge> edges; /* Current edges */
